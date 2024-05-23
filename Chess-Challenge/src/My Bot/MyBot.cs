@@ -1,25 +1,18 @@
 ﻿using ChessChallenge.API;
-using Microsoft.CodeAnalysis;
 using System;
-using System.Collections.Generic;
-using static System.Formats.Asn1.AsnWriter;
 
 public class MyBot : IChessBot
 {
 
     // scores based off of https://www.chessprogramming.org/Simplified_Evaluation_Function
-    private static int PAWN_BASE_SCORE = 100;
-    private static int KNIGHT_BASE_SCORE = 320;
-    private static int BISHOP_BASE_SCORE = 330;
-    private static int ROOK_BASE_SCORE = 500;
-    private static int QUEEN_BASE_SCORE = 900;
-    private static int KING_BASE_SCORE = 20000;
+    int PAWN_BASE_SCORE = 100;
+    int KNIGHT_BASE_SCORE = 320;
+    int BISHOP_BASE_SCORE = 330;
+    int ROOK_BASE_SCORE = 500;
+    int QUEEN_BASE_SCORE = 900;
+    int KING_BASE_SCORE = 20000;
 
-    private static int BASE_BOARD_SCORE = PAWN_BASE_SCORE * 8 + KNIGHT_BASE_SCORE * 2 + BISHOP_BASE_SCORE * 2 + ROOK_BASE_SCORE * 2 + QUEEN_BASE_SCORE + KING_BASE_SCORE;
-
-
-    private Board board;
-    private int movesConsidered;
+    Board board;
 
     // offsets based off of https://www.chessprogramming.org/Simplified_Evaluation_Function
     private int[] whitePawnOffset = new int[]
@@ -121,24 +114,31 @@ public class MyBot : IChessBot
     public Move Think(Board board, Timer timer)
     {
         this.board = board;
-        movesConsidered = 0;
         Move[] moves = board.GetLegalMoves();
         Move bestMove = moves[0];
-        float bestScore = float.NegativeInfinity;
+        float bestScore = -100000;
+        int depthSearched = 0;
 
-        foreach (Move move in moves)
+        for (int depth = 1; depth < 60; depth++)
         {
-            board.MakeMove(move);
-            float score = -AlphaBetaNegaMax(3, float.NegativeInfinity, float.PositiveInfinity);
-            board.UndoMove(move);
-            if (score > bestScore)
+            depthSearched++;
+            foreach (Move move in moves)
             {
-                bestMove = move;
-                bestScore = score;
+                board.MakeMove(move);
+                float score = -AlphaBetaNegaMax(depth, -100000, 100000);
+                board.UndoMove(move);
+                if (score > bestScore)
+                {
+                    bestMove = move;
+                    bestScore = score;
+                }
+                if (timer.MillisecondsElapsedThisTurn > 2000 || (timer.MillisecondsRemaining < 10000 && depth >= 3))
+                {
+                    Console.WriteLine(depthSearched);
+                    return bestMove;
+                }
             }
         }
-
-        Console.WriteLine(movesConsidered);
         return bestMove;
     }
 
@@ -149,9 +149,7 @@ public class MyBot : IChessBot
 
         Move[] moves = board.GetLegalMoves();
         if (moves.Length == 0)
-        {
             return board.IsInCheck() ? float.NegativeInfinity : 0;
-        }
 
         foreach (Move move in moves)
         {
@@ -194,7 +192,6 @@ public class MyBot : IChessBot
 
     private float EvaluateSide(bool isWhite)
     {
-        movesConsidered++;
         float score = 0;
         PieceList[] pieceLists = board.GetAllPieceLists();
         int pieceCount = 0;
